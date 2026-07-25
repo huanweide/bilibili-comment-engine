@@ -1,3 +1,9 @@
+<!-- badges -->
+[![License](https://img.shields.io/github/license/huanweide/bilibili-comment-engine)](LICENSE)
+[![CI](https://github.com/huanweide/bilibili-comment-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/huanweide/bilibili-comment-engine/actions/workflows/ci.yml)
+[![Stars](https://img.shields.io/github/stars/huanweide/bilibili-comment-engine)](https://github.com/huanweide/bilibili-comment-engine/stargazers)
+<!-- /badges -->
+
 # Bilibili Comment Engine
 
 > AI 驱动的 B站 评论区推广工具——搜索目标视频 → 理解视频内容 → 生成真人级评论 → 一键发布。  
