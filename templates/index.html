@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bilibili Comment Engine</title>
+<style>
+:root {
+  --bg: #0d1117; --surface: #161b22; --surface2: #1c2333;
+  --border: #30363d; --text: #e6edf3; --text2: #8b949e;
+  --accent: #58a6ff; --green: #3fb950; --orange: #d29922; --red: #f85149;
+  --radius: 8px;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg); color: var(--text); line-height:1.5;
+  min-height: 100vh;
+}
+.app { max-width: 1100px; margin:0 auto; padding:20px; }
+
+/* Header */
+.header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 24px; background:var(--surface); border-radius:var(--radius);
+  border:1px solid var(--border); margin-bottom:20px; flex-wrap:wrap; gap:10px;
+}
+.header h1 { font-size:20px; display:flex; align-items:center; gap:10px; }
+.header h1 span { color:var(--accent); }
+.header-right { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.status-badge {
+  font-size:13px; padding:4px 12px; border-radius:20px;
+  background:var(--surface2); border:1px solid var(--border);
+  display:flex; align-items:center; gap:6px;
+}
+.status-badge .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
+.dot.online { background:var(--green); box-shadow:0 0 6px var(--green); }
+.dot.offline { background:var(--text2); }
+
+/* Cards */
+.card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:20px; margin-bottom:16px;
+}
+.card-title {
+  font-size:13px; font-weight:600; color:var(--text2);
+  text-transform:uppercase; letter-spacing:0.5px; margin-bottom:12px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+
+/* Buttons */
+.btn {
+  padding:10px 18px; border:none; border-radius:var(--radius);
+  font-size:14px; font-weight:500; cursor:pointer; transition:all 0.15s;
+  white-space:nowrap; display:inline-flex; align-items:center; gap:6px;
+}
+.btn:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover:not(:disabled) { filter:brightness(1.1); }
+.btn-green { background:var(--green); color:#fff; }
+.btn-green:hover:not(:disabled) { filter:brightness(1.1); }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text); }
+.btn-outline:hover { border-color:var(--text2); }
+.btn-sm { padding:5px 12px; font-size:12px; }
+.btn-danger { background:var(--red); color:#fff; }
+.btn-danger:hover:not(:disabled) { filter:brightness(1.1); }
+.btn-ghost { background:transparent; border:none; color:var(--text2); cursor:pointer; }
+.btn-ghost:hover { color:var(--text); }
+
+/* Inputs */
+input[type="text"], input[type="password"], input[type="number"], textarea, select {
+  background:var(--surface2); border:1px solid var(--border);
+  border-radius:var(--radius); color:var(--text); font-size:14px; outline:none;
+  padding:8px 12px; width:100%;
+}
+input:focus, textarea:focus, select:focus { border-color:var(--accent); }
+textarea { resize:vertical; font-family:inherit; line-height:1.6; }
+select { cursor:pointer; }
+input[type="number"] { width:60px; }
+
+/* Toggle */
+.toggle-row { display:flex; align-items:center; gap:12px; margin:10px 0; }
+.toggle { position:relative; width:44px; height:24px; flex-shrink:0; cursor:pointer; }
+.toggle input { display:none; }
+.toggle-slider {
+  position:absolute; inset:0; background:var(--surface2); border:1px solid var(--border);
+  border-radius:12px; transition:0.2s;
+}
+.toggle-slider::before {
+  content:''; position:absolute; width:18px; height:18px; left:2px; top:2px;
+  background:var(--text2); border-radius:50%; transition:0.2s;
+}
+.toggle input:checked+.toggle-slider { background:var(--accent); border-color:var(--accent); }
+.toggle input:checked+.toggle-slider::before { background:#fff; transform:translateX(20px); }
+.toggle-label { font-size:14px; color:var(--text); cursor:pointer; }
+.toggle-hint { font-size:12px; color:var(--text2); }
+
+/* Keywords */
+.kw-row { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+.kw-row input[type="text"] { flex:1; min-width:150px; }
+.kw-list { display:flex; flex-wrap:wrap; gap:8px; }
+.kw-item {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 6px 4px 10px; background:var(--surface2);
+  border:1px solid var(--border); border-radius:20px; font-size:13px;
+}
+.kw-item select {
+  width:48px; padding:2px 2px; font-size:12px;
+  background:var(--bg); border:1px solid var(--border); border-radius:4px;
+  text-align:center;
+}
+.kw-item .remove { color:var(--text2); font-size:16px; line-height:1; cursor:pointer; }
+.kw-item .remove:hover { color:var(--red); }
+
+/* Style */
+.style-area textarea { min-height:80px; }
+
+/* Results */
+.video-list { display:flex; flex-direction:column; gap:12px; }
+.video-card {
+  background:var(--surface2); border:1px solid var(--border);
+  border-left:3px solid var(--accent);
+  border-radius:var(--radius); padding:16px; transition:opacity 0.3s;
+}
+.video-card.posted { border-left-color:var(--green); opacity:0.75; }
+.video-card.skipped { border-left-color:var(--text2); opacity:0.6; }
+.video-card-header {
+  display:flex; justify-content:space-between; align-items:flex-start;
+  margin-bottom:6px; gap:12px;
+}
+.video-title { font-size:15px; font-weight:500; color:var(--text); text-decoration:none; flex:1; }
+.video-title:hover { color:var(--accent); }
+.video-meta { font-size:12px; color:var(--text2); display:flex; gap:12px; flex-wrap:wrap; }
+.comment-area { margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
+.comment-edit {
+  width:100%; min-height:60px; padding:10px 12px;
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:var(--radius); color:var(--text); font-size:14px;
+  line-height:1.6; font-family:inherit; resize:vertical; outline:none;
+}
+.comment-edit:focus { border-color:var(--accent); }
+.comment-actions {
+  display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; align-items:center;
+}
+.quality-badge { padding:2px 8px; border-radius:10px; font-size:12px; font-weight:500; }
+.quality-high { background:#1a3a2a; color:var(--green); }
+.quality-mid { background:#3a2a1a; color:var(--orange); }
+.quality-low { background:#3a1a1a; color:var(--red); }
+.style-badge {
+  padding:2px 8px; border-radius:10px; font-size:12px;
+  background:var(--surface2); color:var(--text2); border:1px solid var(--border);
+}
+
+/* History */
+.history-list { display:flex; flex-direction:column; gap:4px; }
+.history-item {
+  display:flex; gap:10px; align-items:center; padding:8px 10px;
+  background:var(--bg); border-radius:var(--radius); font-size:13px;
+}
+.history-time { color:var(--text2); flex-shrink:0; min-width:80px; }
+.history-bvid { color:var(--accent); flex-shrink:0; min-width:100px; font-family:monospace; }
+.history-comment { color:var(--text); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.history-status { flex-shrink:0; }
+.history-status.ok { color:var(--green); }
+.history-status.fail { color:var(--red); }
+
+/* Log */
+.log-box {
+  background:var(--bg); border:1px solid var(--border);
+  border-radius:var(--radius); padding:12px; max-height:180px;
+  overflow-y:auto; font-family:'Cascadia Code','Fira Code',monospace; font-size:12px; line-height:1.6;
+}
+.log-entry { display:flex; gap:8px; }
+.log-time { color:var(--text2); flex-shrink:0; }
+.log-msg.warn { color:var(--orange); }
+.log-msg.error { color:var(--red); }
+.log-msg.success { color:var(--green); }
+
+/* Modal */
+.modal-overlay {
+  display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.7); z-index:1000;
+  justify-content:center; align-items:center;
+}
+.modal-overlay.open { display:flex; }
+.modal-box {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius); padding:24px; width:90%; max-width:500px;
+}
+.modal-box h2 { font-size:18px; margin-bottom:16px; }
+
+/* Confirm dialog */
+.confirm-overlay {
+  display:none; position:fixed; top:0; left:0; right:0; bottom:0;
+  background:rgba(0,0,0,0.8); z-index:2000;
+  justify-content:center; align-items:center;
+}
+.confirm-overlay.open { display:flex; }
+.confirm-box {
+  background:var(--surface); border:1px solid var(--orange);
+  border-radius:var(--radius); padding:24px; max-width:440px; width:90%;
+}
+.confirm-box p { font-size:14px; margin-bottom:16px; line-height:1.6; }
+.confirm-actions { display:flex; gap:10px; justify-content:flex-end; }
+
+/* Empty */
+.empty-state { text-align:center; padding:40px 20px; color:var(--text2); }
+.empty-state .icon { font-size:48px; margin-bottom:12px; }
+
+/* Spinner */
+.spinner {
+  display:inline-block; width:16px; height:16px;
+  border:2px solid var(--border); border-top-color:var(--accent);
+  border-radius:50%; animation:spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* Collapse */
+.collapse-header {
+  cursor:pointer; user-select:none; display:flex; align-items:center; gap:6px;
+}
+.collapse-header:hover { color:var(--text); }
+.collapse-body { display:none; margin-top:10px; }
+.collapse-body.open { display:block; }
+
+@media (max-width:768px) { .app { padding:12px; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Header -->
+  <div class="header">
+    <h1><span>Bilibili</span> Comment Engine</h1>
+    <div class="header-right">
+      <span class="status-badge" id="biliLoginArea">
+        <span class="dot offline" id="biliDot"></span>
+        <span id="biliStatus">未登录</span>
+      </span>
+      <button class="btn btn-green btn-sm" id="loginBtn" onclick="startBiliLogin()">扫码登录</button>
+      <button class="btn btn-outline btn-sm" style="display:none" id="logoutBtn" onclick="logoutBili()">退出</button>
+      <button class="btn btn-outline btn-sm" onclick="openModal('settingsModal')">设置</button>
+    </div>
+  </div>
+
+  <!-- Keywords -->
+  <div class="card">
+    <div class="card-title">
+      <span>搜索关键词 <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--text2)">每个关键词右侧可选提取数量，默认按热度排序</span></span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm" onclick="clearResults()">清空结果</button>
+        <button class="btn btn-primary" id="runBtn" onclick="runBatch()">批量运行</button>
+      </div>
+    </div>
+    <div class="kw-row">
+      <input type="text" id="kwInput" placeholder="DeepSeek、AI、大模型..."
+             onkeydown="if(event.key==='Enter') addKeyword()">
+      <button class="btn btn-outline btn-sm" onclick="addKeyword()">+ 添加</button>
+    </div>
+    <div class="kw-list" id="kwList"></div>
+  </div>
+
+  <!-- Comment Style -->
+  <div class="card">
+    <div class="card-title">
+      评论风格
+      <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--text2)">
+        AI 会严格按你的要求写，不会丢失信息
+      </span>
+    </div>
+    <div class="style-area">
+      <textarea id="stylePrompt" placeholder="描述你想要什么样的评论&#10;&#10;例：以普通B站用户口吻，自然地提到硅基流动邀请码 axOmWfWi，注册送16元。语气轻松，看起来像真实使用体验。不要硬广。&#10;&#10;注意：你的要求就是最高指令，AI 不会擅自改变"></textarea>
+    </div>
+    <div class="toggle-row">
+      <label class="toggle">
+        <input type="checkbox" id="ctxToggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+      <div>
+        <div class="toggle-label" onclick="document.getElementById('ctxToggle').click()">根据视频内容写评论（开启=每条不同 / 关闭=全部相同）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsArea">
+    <div class="empty-state">
+      <div class="icon">🔍</div>
+      <p>添加关键词 → 设置每个搜几个 → 批量运行</p>
+      <p style="font-size:12px;margin-top:8px;color:var(--text2)">已评论过的视频会自动跳过</p>
+    </div>
+  </div>
+
+  <!-- History (collapsible) -->
+  <div class="card">
+    <div class="card-title">
+      <span class="collapse-header" onclick="toggleHistory()">
+        <span id="historyArrow">▶</span> 历史记录
+      </span>
+      <span style="font-size:12px;font-weight:400;color:var(--text2)" id="historyCount"></span>
+    </div>
+    <div class="collapse-body" id="historyBody">
+      <div id="historyList" style="max-height:300px;overflow-y:auto">
+        <div style="text-align:center;padding:12px;color:var(--text2)">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="card">
+    <div class="card-title">
+      <span>运行日志</span>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('logBox').innerHTML=''">清空</button>
+    </div>
+    <div class="log-box" id="logBox"></div>
+  </div>
+</div>
+
+<!-- Confirm Dialog -->
+<div class="confirm-overlay" id="confirmDlg">
+  <div class="confirm-box">
+    <h2>确认发布</h2>
+    <p id="confirmMsg">确定要发布这条评论吗？</p>
+    <div class="confirm-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-green btn-sm" id="confirmOkBtn" onclick="closeConfirm()">确定发布</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal-box">
+    <h2>设置</h2>
+
+    <div style="margin-bottom:14px">
+      <div class="toggle-hint" style="margin-bottom:4px">API Key（必填，你自己的密钥）</div>
+      <input type="password" id="apiKeyInput" placeholder="sk-..." style="width:100%">
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div class="toggle-hint" style="margin-bottom:4px">接口地址</div>
+      <input type="text" id="baseUrlInput" placeholder="https://api.deepseek.com" style="width:100%">
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">默认 DeepSeek 官方 API，兼容 OpenAI 格式的都可以填</div>
+    </div>
+
+    <div style="margin-bottom:14px">
+      <div class="toggle-hint" style="margin-bottom:4px">模型</div>
+      <div style="display:flex;gap:6px">
+        <select id="modelSelect" style="flex:1">
+          <option value="">— 先获取模型列表 —</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <button class="btn btn-outline btn-sm" id="fetchModelsBtn" onclick="fetchModels()">获取模型列表</button>
+        <button class="btn btn-outline btn-sm" id="verifyBtn" onclick="verifyConnection()">验证连接</button>
+      </div>
+      <div id="llmStatus" style="font-size:12px;margin-top:6px;color:var(--text2)"></div>
+    </div>
+
+    <div style="margin-bottom:14px;border-top:1px solid var(--border);padding-top:12px">
+      <div class="toggle-hint" style="margin-bottom:4px">默认邀请信息（可选）</div>
+      <input type="text" id="invCodeInput" placeholder="邀请码" style="width:100%;margin-bottom:4px">
+      <input type="text" id="invLinkInput" placeholder="邀请链接" style="width:100%">
+    </div>
+
+    <div class="toggle-row" style="justify-content:flex-end;">
+      <button class="btn btn-outline btn-sm" onclick="closeModal('settingsModal')">关闭</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSettings()">保存</button>
+    </div>
+  </div>
+</div><!-- QR Login Modal -->
+<div class="modal-overlay" id="qrModal">
+  <div class="modal-box" style="text-align:center">
+    <h2>扫码登录 B站</h2>
+    <div id="qrDisplay" style="margin:20px 0">
+      <div style="padding:40px"><span class="spinner"></span></div>
+    </div>
+    <p id="qrStatus" style="font-size:14px;color:var(--text2)">生成二维码中...</p>
+    <div style="margin-top:16px">
+      <button class="btn btn-outline btn-sm" onclick="cancelBiliLogin()">取消</button>
+    </div>
+  </div>
+</div>    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// State
+// ══════════════════════════════════════════════════════
+const S = {
+  keywords: [],
+  results: [],
+  running: false,
+  postedCount: 0,
+  _confirmCb: null,
+  _qrPollTimer: null,
+  apiKey: localStorage.getItem('bce_api_key') || '',
+  baseUrl: localStorage.getItem('bce_base_url') || '',
+  model: localStorage.getItem('bce_model') || '',
+  invCode: localStorage.getItem('bce_invite_code') || '',
+  invLink: localStorage.getItem('bce_invite_link') || '',
+};
+
+const $ = id => document.getElementById(id);
+
+// ══════════════════════════════════════════════════════
+// Log
+// ══════════════════════════════════════════════════════
+function log(msg, type='') {
+  const box = $('logBox');
+  const el = document.createElement('div');
+  el.className = 'log-entry';
+  el.innerHTML = `<span class="log-time">[${new Date().toLocaleTimeString()}]</span><span class="log-msg ${type}">${msg}</span>`;
+  box.appendChild(el); box.scrollTop = box.scrollHeight;
+}
+
+// ══════════════════════════════════════════════════════
+// Settings
+// ══════════════════════════════════════════════════════
+function openModal(id) { $(id).classList.add('open'); }
+function closeModal(id) { $(id).classList.remove('open'); }
+function saveSettings() {
+  S.apiKey = $('apiKeyInput').value.trim();
+  S.baseUrl = $('baseUrlInput').value.trim();
+  S.model = $('modelSelect').value;
+  S.invCode = $('invCodeInput').value.trim();
+  S.invLink = $('invLinkInput').value.trim();
+  localStorage.setItem('bce_api_key', S.apiKey);
+  localStorage.setItem('bce_base_url', S.baseUrl);
+  localStorage.setItem('bce_model', S.model);
+  localStorage.setItem('bce_invite_code', S.invCode);
+  localStorage.setItem('bce_invite_link', S.invLink);
+  closeModal('settingsModal');
+  log('设置已保存', 'success');
+}
+function headers() {
+  return {'Content-Type':'application/json'};
+}
+
+// ══════════════════════════════════════════════════════
+// B站 Login (扫码登录)
+// ══════════════════════════════════════════════════════
+async function checkLogin() {
+  try {
+    const r = await fetch('/api/bili/status');
+    const d = await r.json();
+    if (d.logged_in) {
+      $('biliDot').className='dot online';
+      $('biliStatus').textContent=d.uname;
+      $('loginBtn').style.display='none';
+      $('logoutBtn').style.display='inline-flex';
+      return true;
+    }
+    $('biliDot').className='dot offline';
+    $('biliStatus').textContent='未登录';
+    $('loginBtn').style.display='inline-flex';
+    $('logoutBtn').style.display='none';
+    return false;
+  } catch(e) {
+    $('biliDot').className='dot offline';
+    $('biliStatus').textContent='连接失败';
+    return false;
+  }
+}
+
+async function startBiliLogin() {
+  openModal('qrModal');
+  $('qrDisplay').innerHTML = '<div style="padding:40px"><span class="spinner"></span></div>';
+  $('qrStatus').textContent = '生成二维码中...';
+
+  try {
+    const r = await fetch('/api/bili/qrcode/generate');
+    const d = await r.json();
+    if (d.error) { $('qrStatus').textContent='生成失败: '+d.error; return; }
+
+    // 显示二维码（用 api.qrserver.com 渲染）
+    $('qrDisplay').innerHTML =
+      `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(d.url)}"
+            alt="扫码登录" style="border-radius:8px;background:#fff;padding:8px">`;
+    $('qrStatus').textContent = '打开手机 B站 扫码登录';
+
+    // 开始轮询
+    S._qrPollTimer = setInterval(async () => {
+      try {
+        const p = await fetch('/api/bili/qrcode/poll?key=' + d.qrcode_key);
+        const ps = await p.json();
+        if (ps.status === 'confirmed') {
+          clearInterval(S._qrPollTimer);
+          S._qrPollTimer = null;
+          closeModal('qrModal');
+          log('B站 登录成功！欢迎 ' + ps.uname, 'success');
+          checkLogin();
+        } else if (ps.status === 'scanned') {
+          $('qrStatus').textContent = '已扫码，请在手机上确认';
+        }
+      } catch(e) { /* retry */ }
+    }, 2000);
+  } catch(e) {
+    $('qrStatus').textContent = '连接失败: ' + e.message;
+  }
+}
+
+function cancelBiliLogin() {
+  if (S._qrPollTimer) { clearInterval(S._qrPollTimer); S._qrPollTimer = null; }
+  closeModal('qrModal');
+}
+
+async function logoutBili() {
+  await fetch('/api/bili/logout', {method:'POST'});
+  checkLogin();
+  log('已退出 B站');
+}
+
+// ══════════════════════════════════════════════════════
+// LLM 配置
+// ══════════════════════════════════════════════════════
+async function fetchModels() {
+  const key = $('apiKeyInput').value.trim();
+  const url = $('baseUrlInput').value.trim();
+  if (!key) { $('llmStatus').textContent='请先填写 API Key'; $('llmStatus').style.color='var(--orange)'; return; }
+  $('llmStatus').textContent='获取中...'; $('llmStatus').style.color='var(--text2)';
+  $('fetchModelsBtn').disabled = true;
+  try {
+    const r = await fetch('/api/llm/models', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({api_key:key, base_url:url})
+    });
+    const d = await r.json();
+    if (d.error) { $('llmStatus').textContent=d.error; $('llmStatus').style.color='var(--red)'; return; }
+    const sel = $('modelSelect');
+    sel.innerHTML = '<option value="">— 选择模型 —</option>' + d.models.map(m => '<option value="'+m+'">'+m+'</option>').join('');
+    $('llmStatus').textContent='获取到 '+d.total+' 个模型，请选择一个'; $('llmStatus').style.color='var(--green)';
+  } catch(e) { $('llmStatus').textContent='请求失败: '+e.message; $('llmStatus').style.color='var(--red)'; }
+  finally { $('fetchModelsBtn').disabled = false; }
+}
+
+async function verifyConnection() {
+  const key = $('apiKeyInput').value.trim();
+  const url = $('baseUrlInput').value.trim();
+  const model = $('modelSelect').value;
+  if (!key) { $('llmStatus').textContent='请填写 API Key'; $('llmStatus').style.color='var(--orange)'; return; }
+  if (!model) { $('llmStatus').textContent='请先获取模型列表并选择一个'; $('llmStatus').style.color='var(--orange)'; return; }
+  $('llmStatus').textContent='验证中...'; $('llmStatus').style.color='var(--text2)';
+  $('verifyBtn').disabled = true;
+  try {
+    const r = await fetch('/api/llm/verify', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({api_key:key, base_url:url, model:model})
+    });
+    const d = await r.json();
+    if (d.ok) {
+      $('llmStatus').textContent='✅ 连接成功 | 模型: '+d.model+' | 回复: '+d.reply+' | 消耗: '+d.tokens+' tokens';
+      $('llmStatus').style.color='var(--green)';
+    } else {
+      $('llmStatus').textContent='❌ 失败: '+d.error; $('llmStatus').style.color='var(--red)';
+    }
+  } catch(e) { $('llmStatus').textContent='请求失败: '+e.message; $('llmStatus').style.color='var(--red)'; }
+  finally { $('verifyBtn').disabled = false; }
+}
+
+// ══════════════════════════════════════════════════════
+// Keywords (with per-keyword count)
+// ══════════════════════════════════════════════════════
+function addKeyword() {
+  const kw = $('kwInput').value.trim();
+  if (!kw || S.keywords.some(k => k.word === kw)) return;
+  S.keywords.push({word: kw, count: 5});
+  renderKw();
+  $('kwInput').value = '';
+}
+function removeKeyword(word) { S.keywords = S.keywords.filter(k => k.word !== word); renderKw(); }
+function setKwCount(word, val) {
+  const k = S.keywords.find(x => x.word === word);
+  if (k) k.count = parseInt(val) || 3;
+}
+function renderKw() {
+  $('kwList').innerHTML = S.keywords.map(k =>
+    `<span class="kw-item">
+      ${k.word}
+      <select onchange="setKwCount('${k.word}',this.value)">
+        ${[3,5,10,15,20].map(n => `<option value="${n}" ${n===k.count?'selected':''}>${n}</option>`).join('')}
+      </select>
+      <span class="remove" onclick="removeKeyword('${k.word}')">&times;</span>
+    </span>`
+  ).join('');
+}
+
+// ══════════════════════════════════════════════════════
+// Confirm
+// ══════════════════════════════════════════════════════
+function confirm(msg, cb) {
+  $('confirmMsg').textContent = msg;
+  $('confirmOkBtn').onclick = () => { closeConfirm(); if(cb) cb(); };
+  $('confirmDlg').classList.add('open');
+}
+function closeConfirm() { $('confirmDlg').classList.remove('open'); }
+
+// ══════════════════════════════════════════════════════
+// Run
+// ══════════════════════════════════════════════════════
+async function runBatch() {
+  if (S.running) return;
+  if (!S.keywords.length) { log('请添加关键词', 'warn'); return; }
+
+  S.running = true;
+  const btn = $('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 运行中...';
+  $('resultsArea').innerHTML = '<div style="text-align:center;padding:40px"><span class="spinner"></span><p style="margin-top:12px;color:var(--text2)">搜索并生成评论...</p></div>';
+
+  const styleP = $('stylePrompt').value.trim();
+  const ctxOn = $('ctxToggle').checked;
+  let totalNew = 0, totalSkip = 0;
+
+  for (const kw of S.keywords) {
+    try {
+      const body = { keyword: kw.word, max_videos: kw.count, context_aware: ctxOn, api_key: S.apiKey, base_url: S.baseUrl, model: S.model };
+      if (styleP) body.style_prompt = styleP;
+      if (S.invCode) body.invite_code = S.invCode;
+      if (S.invLink) body.invite_link = S.invLink;
+
+      const resp = await fetch('/api/batch', { method:'POST', headers:headers(), body:JSON.stringify(body) });
+      const data = await resp.json();
+      if (data.results) {
+        const ready = data.results.filter(r => r.status==='ready');
+        const skip = data.results.filter(r => r.status==='skipped');
+        totalNew += ready.length; totalSkip += skip.length;
+        S.results.push(...data.results);
+        log(`[${kw.word}] ${ready.length} 新 + ${skip.length} 跳过`, ready.length ? 'success' : '');
+      }
+    } catch(e) { log(`[${kw.word}] 异常: ${e.message}`, 'error'); }
+  }
+
+  renderResults();
+  btn.disabled = false; btn.textContent = '批量运行';
+  S.running = false;
+  log(`完成: ${totalNew} 新评论 + ${totalSkip} 自动跳过`, 'success');
+}
+
+// ══════════════════════════════════════════════════════
+// Render
+// ══════════════════════════════════════════════════════
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+function renderResults() {
+  if (!S.results.length) {
+    $('resultsArea').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><p>暂无结果</p></div>';
+    return;
+  }
+  let html = '';
+  const ready = S.results.filter(r => r.status==='ready');
+  if (ready.length) {
+    html += `<div style="margin-bottom:12px;display:flex;gap:8px;align-items:center;">
+      <button class="btn btn-green" onclick="confirm('确定发布全部 ${ready.length} 条评论？每条间隔 8 秒', postAll)">发布全部 (${ready.length})</button>
+      <span style="font-size:12px;color:var(--text2)">点击确定后自动逐条发布</span>
+    </div>`;
+  }
+  html += '<div class="video-list">';
+  for (const r of S.results) {
+    const cls = r.status==='posted'?'posted': r.status==='skipped'?'skipped':'';
+    const qCls = (r.quality||3)>=4?'quality-high': (r.quality||3)>=3?'quality-mid':'quality-low';
+    html += `<div class="video-card ${cls}">
+      <div class="video-card-header">
+        <a href="${r.url||'#'}" target="_blank" class="video-title">${esc(r.title||r.bvid)}</a>
+        ${r.status==='posted'?'<span style="color:var(--green);font-size:13px">已发布</span>':
+          r.status==='skipped'?`<span style="color:var(--text2);font-size:13px">跳过: ${esc(r.reason||'')}</span>`:
+          '<span style="color:var(--accent);font-size:13px">待发布</span>'}
+      </div>
+      <div class="video-meta">
+        ${r.author?`<span>UP: ${esc(r.author)}</span>`:''}
+        <span style="font-family:monospace">${r.bvid}</span>
+        ${r.keyword?`<span style="background:var(--surface2);padding:1px 6px;border-radius:4px">${esc(r.keyword)}</span>`:''}
+      </div>`;
+    if (r.comment) {
+      html += `<div class="comment-area">
+        <textarea class="comment-edit" id="ce-${r.bvid}">${esc(r.comment)}</textarea>
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">可直接编辑修改</div>
+        <div class="comment-actions">
+          <span class="quality-badge ${qCls}">${r.quality}/5</span>
+          ${r.style?`<span class="style-badge">${esc(r.style)}</span>`:''}`;
+      if (r.status==='ready') {
+        html += `<button class="btn btn-green btn-sm" onclick="confirm('确定发布这条评论？',()=>postComment('${r.bvid}'))">发布</button>
+          <button class="btn btn-outline btn-sm" onclick="regenerate('${r.bvid}')">重新生成</button>`;
+      }
+      html += `<span id="res-${r.bvid}"></span></div></div>`;
+    } else if (r.reason) {
+      html += `<div class="comment-area"><div style="color:var(--text2);font-size:14px">${esc(r.reason)}</div></div>`;
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  $('resultsArea').innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════
+// Post
+// ══════════════════════════════════════════════════════
+async function postComment(bvid) {
+  const r = S.results.find(x => x.bvid === bvid);
+  if (!r) return;
+  const el = document.getElementById(`res-${bvid}`);
+  const edited = document.getElementById(`ce-${bvid}`)?.value || r.comment;
+  if (el) el.innerHTML = '<span class="spinner"></span>';
+
+  try {
+    const resp = await fetch('/api/bili/post-comment', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({bvid, message:edited})
+    });
+    const data = await resp.json();
+
+    if (data.success) {
+      if(el) el.innerHTML='<span style="color:var(--green);font-size:12px">成功</span>';
+      r.status='posted'; S.postedCount++;
+      log(`发布成功 [${bvid}]`, 'success');
+      loadHistory();
+      renderResults();
+    } else if (data.need_login) {
+      if(el) el.innerHTML='<span style="color:var(--orange);font-size:12px">请先扫码登录B站</span>';
+    } else {
+      if(el) el.innerHTML=`<span style="color:var(--red);font-size:12px">${data.message||data.code}</span>`;
+      if (data.code===-101) checkLogin();
+      else log(`失败 [${bvid}]: ${data.message||data.code}`, 'warn');
+    }
+  } catch(e) { if(el) el.innerHTML=`<span style="color:var(--red);font-size:12px">${e.message}</span>`; }
+}
+
+async function postAll() {
+  const ready = S.results.filter(r => r.status==='ready');
+  for (const r of ready) { await postComment(r.bvid); await new Promise(r=>setTimeout(r,8000)); }
+  log('全部发布完成', 'success');
+}
+
+// ══════════════════════════════════════════════════════
+// Regenerate
+// ══════════════════════════════════════════════════════
+async function regenerate(bvid) {
+  const idx = S.results.findIndex(r => r.bvid === bvid);
+  if (idx < 0) return;
+  S.results.splice(idx, 1);
+  try {
+    const gen = await (await fetch('/api/generate', {method:'POST',headers:headers(),
+      body:JSON.stringify({bvid, topic: S.keywords[0]?.word||bvid, style_prompt: $('stylePrompt').value.trim(),
+      context_aware: $('ctxToggle').checked, api_key: S.apiKey, base_url: S.baseUrl, model: S.model})})).json();
+    if (gen.error) { log(`重新生成失败: ${gen.error}`, 'error'); renderResults(); return; }
+    S.results.push({bvid, url:`https://www.bilibili.com/video/${bvid}`, title:gen.video_title||bvid,
+      comment:gen.comment, quality:gen.quality, style:gen.style, status:'ready'});
+    renderResults();
+    log(`已重新生成 [${bvid}]`, 'success');
+  } catch(e) { log(`异常: ${e.message}`, 'error'); renderResults(); }
+}
+
+// ══════════════════════════════════════════════════════
+// Clear
+// ══════════════════════════════════════════════════════
+function clearResults() {
+  if (S.results.length) confirm('清空当前搜索结果？不会影响已发布的记录', () => { S.results=[]; renderResults(); log('已清空'); });
+}
+
+// ══════════════════════════════════════════════════════
+// History
+// ══════════════════════════════════════════════════════
+let _historyOpen = false;
+function toggleHistory() {
+  _historyOpen = !_historyOpen;
+  $('historyBody').classList.toggle('open', _historyOpen);
+  $('historyArrow').textContent = _historyOpen ? '▼' : '▶';
+  if (_historyOpen) loadHistory();
+}
+async function loadHistory() {
+  try {
+    const resp = await fetch('/api/history');
+    const data = await resp.json();
+    const list = $('historyList');
+    $('historyCount').textContent = `共 ${data.total} 条`;
+    if (!data.records.length) { list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text2)">暂无记录</div>'; return; }
+    list.innerHTML = data.records.map(r =>
+      `<div class="history-item">
+        <span class="history-time">${r.posted_at?.slice(5,16)||''}</span>
+        <span class="history-bvid">${r.bvid}</span>
+        <span class="history-comment" title="${esc(r.comment||'')}">${esc((r.comment||'').slice(0,50))}</span>
+        <span class="history-status ${r.rpid?'ok':'fail'}">${r.rpid?'已发':'未发'}</span>
+      </div>`
+    ).join('');
+  } catch(e) { $('historyList').innerHTML='<div style="color:var(--red);padding:12px">加载失败</div>'; }
+}
+
+// ══════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════
+addKeyword(); // Start with empty, user adds
+S.keywords = []; renderKw();
+// 填充设置面板
+$('apiKeyInput').value = S.apiKey;
+$('baseUrlInput').value = S.baseUrl;
+if (S.model) $('modelSelect').value = S.model;
+$('invCodeInput').value = S.invCode;
+$('invLinkInput').value = S.invLink;
+// 自动检测设置中有没有保存模型
+if (S.model) $('llmStatus').textContent='已选模型: '+S.model;
+if (S.apiKey && !S.model) $('llmStatus').textContent='已填写 API Key，请获取模型列表';
+checkLogin();
+log('就绪 — 添加关键词 → 设数量 → 写风格 → 批量运行', '');
+</script>
+</body>
+</html>
